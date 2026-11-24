@@ -20,14 +20,30 @@ workflows:
       events:
         - push
     scripts:
-      - name: Información del proyecto
+      - name: Localizar el proyecto de Xcode
         script: |
+          set -e
           xcodebuild -version
+          echo "Contenido del repositorio:"
+          ls -la "$CM_BUILD_DIR"
+          # Busca el .xcodeproj aunque esté dentro de una subcarpeta del repo
+          PROJECT_PATH=$(find "$CM_BUILD_DIR" -maxdepth 4 -name "$XCODE_PROJECT" -type d -not -path "*/build/*" | head -n 1)
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "ERROR: no se encontró $XCODE_PROJECT en el repositorio."
+            echo "Asegúrate de haber subido la carpeta FerreteraCD.xcodeproj a GitHub."
+            find "$CM_BUILD_DIR" -maxdepth 4 -not -path "*/.git/*"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+          echo "Proyecto encontrado en: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $CM_ENV
+          cd "$PROJECT_DIR"
           xcodebuild -list -project "$XCODE_PROJECT"
 
       - name: Compilar .app para el simulador de iOS
         script: |
           set -e
+          cd "$PROJECT_DIR"
           xcodebuild build \
             -project "$XCODE_PROJECT" \
             -target "$XCODE_TARGET" \
